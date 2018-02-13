@@ -21,15 +21,16 @@ BUILD_FLAGS=-ldflags "\
 "
 
 GOFILES=$(shell find . -type f -name '*.go' -not -path "./vendor/*")
-GOPKGS=$(shell glide nv)
+GOPKGS=$(shell go list ./...)
 
 default: build
 
-glide.lock: glide.yaml
-	glide update
+Gopkg.lock: Gopkg.toml
+	dep ensure
+	touch Gopkg.lock
 
-vendor: glide.lock glide.yaml
-	glide install
+vendor: Gopkg.lock Gopkg.toml
+	dep ensure
 	touch vendor
 
 format:

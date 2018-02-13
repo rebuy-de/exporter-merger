@@ -1,7 +1,7 @@
 # Source: https://github.com/rebuy-de/golang-template
 # Version: 1.3.1
 
-FROM golang:1.8-alpine
+FROM golang:1.9-alpine
 
 RUN apk add --no-cache git make
 
@@ -12,14 +12,7 @@ RUN mkdir -p ${GOPATH}/src ${GOPATH}/bin
 
 # Install Go Tools
 RUN go get -u github.com/golang/lint/golint
-
-# Install Glide
-RUN go get -u github.com/Masterminds/glide/...
-
-WORKDIR /go/src/github.com/Masterminds/glide
-
-RUN git checkout v0.12.3
-RUN go install
+RUN go get -u github.com/golang/dep/cmd/dep
 
 COPY . /go/src/github.com/rebuy-de/exporter-merger
 WORKDIR /go/src/github.com/rebuy-de/exporter-merger
