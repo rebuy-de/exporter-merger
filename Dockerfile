@@ -11,7 +11,7 @@ ENV PATH /go/bin:$PATH
 RUN mkdir -p ${GOPATH}/src ${GOPATH}/bin
 
 # Install Go Tools
-RUN go get -u github.com/golang/lint/golint
+RUN go get -u golang.org/x/lint/golint
 RUN go get -u github.com/golang/dep/cmd/dep
 
 COPY . /go/src/github.com/rebuy-de/exporter-merger
