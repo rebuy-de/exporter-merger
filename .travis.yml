@@ -6,7 +6,7 @@ services:
   - docker
 
 script:
-- docker build -t exporter-merger --no-cache .
+- docker build --target build-env -t exporter-merger --no-cache .
 - >
   docker run
   --name exporter-merger
