@@ -11,16 +11,14 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func testExporter(t testing.TB, content string) (cmd.Exporter, func()) {
+func testExporter(t testing.TB, content string) (string, func()) {
 	t.Helper()
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, content)
 	}))
 
-	return cmd.Exporter{
-		URL: ts.URL,
-	}, ts.Close
+	return ts.URL, ts.Close
 }
 
 func TestHandler(t *testing.T) {
@@ -34,15 +32,13 @@ func TestHandler(t *testing.T) {
 		"bar{} 4\nconflict 5\nshared{meh=\"b\"} 6")
 	defer deferrer()
 
-	config := cmd.Config{
-		Exporters: []cmd.Exporter{
-			te1,
-			te2,
-		},
+	exporters := []string{
+		te1,
+		te2,
 	}
 
 	server := httptest.NewServer(cmd.Handler{
-		Config: config,
+		Exporters: exporters,
 	})
 	defer server.Close()
 
