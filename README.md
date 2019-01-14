@@ -31,7 +31,7 @@ exporter-merger --config-path merger.yaml --listen-port 8080
 
 ### Environment variables
 
-Alternatively configuration can be passed via environment variables, here is part of `exporter-merger -h` output
+Alternatively configuration can be passed via environment variables, here is relevant part of `exporter-merger -h` output:
 ```
       --listen-port int      Listen port for the HTTP server. (ENV:MERGER_PORT) (default 8080)
       --url stringSlice      URL to scrape. Can be speficied multiple times. (ENV:MERGER_URLS,space-seperated)
