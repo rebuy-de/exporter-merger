@@ -11,7 +11,7 @@ import (
 )
 
 type Handler struct {
-	Config Config
+	Exporters []string
 }
 
 func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -30,8 +30,9 @@ func (h Handler) Merge(w io.Writer) error {
 	mfs := map[string]*prom.MetricFamily{}
 	tp := new(expfmt.TextParser)
 
-	for _, e := range h.Config.Exporters {
-		resp, err := http.Get(e.URL)
+	for _, url := range h.Exporters {
+		log.WithField("url", url).Debug("getting remote metrics")
+		resp, err := http.Get(url)
 		if err != nil {
 			return err
 		}
