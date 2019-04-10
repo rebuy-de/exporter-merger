@@ -85,6 +85,4 @@ func (h Handler) Merge(w io.Writer) {
 			return
 		}
 	}
-
-	return
 }
