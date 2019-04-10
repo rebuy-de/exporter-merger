@@ -41,7 +41,7 @@ func (h Handler) Merge(w io.Writer) {
 			httpClient := http.Client{Timeout: httpClientTimeout}
 			resp, err := httpClient.Get(u)
 			if err != nil {
-				log.WithField("url", u).Errorf("HTTP connection filed: %v", err)
+				log.WithField("url", u).Errorf("HTTP connection failed: %v", err)
 				return
 			}
 			defer resp.Body.Close()
