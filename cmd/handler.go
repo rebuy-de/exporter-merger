@@ -4,6 +4,8 @@ import (
 	"io"
 	"net/http"
 	"sort"
+	"sync"
+	"time"
 
 	prom "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
@@ -19,30 +21,45 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"RequestURI": r.RequestURI,
 		"UserAgent":  r.UserAgent(),
 	}).Debug("handling new request")
-	err := h.Merge(w)
-	if err != nil {
-		log.Error(err)
-		w.WriteHeader(500)
-	}
+	h.Merge(w)
 }
 
-func (h Handler) Merge(w io.Writer) error {
+func (h Handler) Merge(w io.Writer) {
 	mfs := map[string]*prom.MetricFamily{}
-	tp := new(expfmt.TextParser)
 
+	responses := make([]map[string]*prom.MetricFamily, 1024)
+	responsesMu := sync.Mutex{}
+
+	httpClientTimeout := time.Second * 10
+
+	wg := sync.WaitGroup{}
 	for _, url := range h.Exporters {
-		log.WithField("url", url).Debug("getting remote metrics")
-		resp, err := http.Get(url)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
+		wg.Add(1)
+		go func(u string) {
+			defer wg.Done()
+			log.WithField("url", u).Debug("getting remote metrics")
+			httpClient := http.Client{Timeout: httpClientTimeout}
+			resp, err := httpClient.Get(u)
+			if err != nil {
+				log.WithField("url", u).Errorf("HTTP connection failed: %v", err)
+				return
+			}
+			defer resp.Body.Close()
 
-		part, err := tp.TextToMetricFamilies(resp.Body)
-		if err != nil {
-			return err
-		}
+			tp := new(expfmt.TextParser)
+			part, err := tp.TextToMetricFamilies(resp.Body)
+			if err != nil {
+				log.WithField("url", u).Errorf("Parse response body to metrics: %v", err)
+				return
+			}
+			responsesMu.Lock()
+			responses = append(responses, part)
+			responsesMu.Unlock()
+		}(url)
+	}
+	wg.Wait()
 
+	for _, part := range responses {
 		for n, mf := range part {
 			mfo, ok := mfs[n]
 			if ok {
@@ -64,10 +81,8 @@ func (h Handler) Merge(w io.Writer) error {
 	for _, n := range names {
 		err := enc.Encode(mfs[n])
 		if err != nil {
-			return err
+			log.Error(err)
+			return
 		}
 	}
-
-	return nil
-
 }
