@@ -17,11 +17,11 @@ func NewRootCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "exporter-merger",
 		Short: "merges Prometheus metrics from multiple sources",
-		Run:   app.run,
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			log.SetLevel(log.DebugLevel)
-		},
-	}
+		Run:   app.run}
+	// PersistentPreRun: func(cmd *cobra.Command, args []string) {
+	// 	log.SetLevel(log.DebugLevel)
+	// },
+	// }
 
 	app.Bind(cmd)
 
@@ -64,6 +64,24 @@ func (app *App) Bind(cmd *cobra.Command) {
 		"Listen port for the HTTP server. (ENV:MERGER_PORT)")
 	app.viper.BindPFlag("port", cmd.PersistentFlags().Lookup("listen-port"))
 
+	cmd.PersistentFlags().Int(
+		"exporters-timeout", 10,
+		"HTTP client timeout for connecting to exporters. (ENV:MERGER_EXPORTERS_TIMEOUT)")
+	app.viper.BindPFlag("exporters-timeout", cmd.PersistentFlags().Lookup("exporters-timeout"))
+
+	cmd.PersistentFlags().String(
+		"log-level", "error",
+		"Log level (possible values: debug, info, warning, error, fatal, panic). (ENV:MERGER_LOG_LEVEL)")
+
+	app.viper.BindPFlag("log-level", cmd.PersistentFlags().Lookup("log-level"))
+
+	loglevel, err := log.ParseLevel(app.viper.GetString("log-level"))
+	if err != nil {
+		log.Fatalf("Error parsing log level: %v", err)
+	}
+
+	log.SetLevel(loglevel)
+
 	cmd.PersistentFlags().StringSlice(
 		"url", nil,
 		"URL to scrape. Can be speficied multiple times. (ENV:MERGER_URLS,space-seperated)")
@@ -72,7 +90,8 @@ func (app *App) Bind(cmd *cobra.Command) {
 
 func (app *App) run(cmd *cobra.Command, args []string) {
 	http.Handle("/metrics", Handler{
-		Exporters: app.viper.GetStringSlice("urls"),
+		Exporters:            app.viper.GetStringSlice("urls"),
+		ExportersHTTPTimeout: app.viper.GetInt("exporters-timeout"),
 	})
 
 	port := app.viper.GetInt("port")
