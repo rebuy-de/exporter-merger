@@ -13,7 +13,8 @@ import (
 )
 
 type Handler struct {
-	Exporters []string
+	Exporters            []string
+	ExportersHTTPTimeout int
 }
 
 func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -29,8 +30,7 @@ func (h Handler) Merge(w io.Writer) {
 
 	responses := make([]map[string]*prom.MetricFamily, 1024)
 	responsesMu := sync.Mutex{}
-
-	httpClientTimeout := time.Second * 10
+	httpClientTimeout := time.Second * time.Duration(h.ExportersHTTPTimeout)
 
 	wg := sync.WaitGroup{}
 	for _, url := range h.Exporters {

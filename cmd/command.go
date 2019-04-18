@@ -19,7 +19,11 @@ func NewRootCommand() *cobra.Command {
 		Short: "merges Prometheus metrics from multiple sources",
 		Run:   app.run,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			log.SetLevel(log.DebugLevel)
+			if app.viper.GetBool("verbose") {
+				log.SetLevel(log.DebugLevel)
+			} else {
+				log.SetLevel(log.InfoLevel)
+			}
 		},
 	}
 
@@ -64,6 +68,16 @@ func (app *App) Bind(cmd *cobra.Command) {
 		"Listen port for the HTTP server. (ENV:MERGER_PORT)")
 	app.viper.BindPFlag("port", cmd.PersistentFlags().Lookup("listen-port"))
 
+	cmd.PersistentFlags().Int(
+		"exporters-timeout", 10,
+		"HTTP client timeout for connecting to exporters. (ENV:MERGER_EXPORTERSTIMEOUT)")
+	app.viper.BindPFlag("exporterstimeout", cmd.PersistentFlags().Lookup("exporters-timeout"))
+
+	cmd.PersistentFlags().BoolP(
+		"verbose", "v", false,
+		"Include debug messages to output (ENV:MERGER_VERBOSE)")
+	app.viper.BindPFlag("verbose", cmd.PersistentFlags().Lookup("verbose"))
+
 	cmd.PersistentFlags().StringSlice(
 		"url", nil,
 		"URL to scrape. Can be speficied multiple times. (ENV:MERGER_URLS,space-seperated)")
@@ -72,7 +86,8 @@ func (app *App) Bind(cmd *cobra.Command) {
 
 func (app *App) run(cmd *cobra.Command, args []string) {
 	http.Handle("/metrics", Handler{
-		Exporters: app.viper.GetStringSlice("urls"),
+		Exporters:            app.viper.GetStringSlice("urls"),
+		ExportersHTTPTimeout: app.viper.GetInt("exporterstimeout"),
 	})
 
 	port := app.viper.GetInt("port")
