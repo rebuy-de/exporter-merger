@@ -30,7 +30,6 @@ func (h Handler) Merge(w io.Writer) {
 
 	responses := make([]map[string]*prom.MetricFamily, 1024)
 	responsesMu := sync.Mutex{}
-
 	httpClientTimeout := time.Second * time.Duration(h.ExportersHTTPTimeout)
 
 	wg := sync.WaitGroup{}
