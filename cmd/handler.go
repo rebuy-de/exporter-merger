@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -71,9 +72,44 @@ func (h Handler) Merge(w io.Writer) {
 		}
 	}
 
+	// Logic to merge metrics based on labels and types.
+	for _, mf := range mfs {
+		// Go through metrics of a metric family and merge them someplace else.
+		merged_metrics_tmp := map[string]*prom.Metric{}
+
+		for _, metric := range mf.GetMetric() {
+			var labels strings.Builder
+
+			// Construct label identifier.
+			for _, label := range metric.GetLabel() {
+				labels.WriteString(label.String())
+			}
+
+			key := labels.String()
+
+			_, ok := merged_metrics_tmp[key]
+			if !ok {
+				// Simple case: metric doesn't exist yet, create it.
+				merged_metrics_tmp[key] = metric
+			} else {
+				// Hard case: if the key already exists, update it.
+				mergeMetricValues(merged_metrics_tmp[key], *metric)
+			}
+		}
+
+		// Create a list of of those metrics.
+		merged_metrics := []*prom.Metric{}
+		for _, metric := range merged_metrics_tmp {
+			merged_metrics = append(merged_metrics, metric)
+		}
+
+		// Replace metrics with merged variant.
+		mf.Metric = merged_metrics
+	}
+
 	names := []string{}
-	for n := range mfs {
-		names = append(names, n)
+	for name := range mfs {
+		names = append(names, name)
 	}
 	sort.Strings(names)
 
@@ -84,5 +120,25 @@ func (h Handler) Merge(w io.Writer) {
 			log.Error(err)
 			return
 		}
+	}
+}
+
+func mergeMetricValues(dst *prom.Metric, src prom.Metric) {
+	if dst.GetGauge() != nil && src.GetGauge() != nil {
+		*(dst.GetGauge().Value) += src.GetGauge().GetValue()
+	}
+	if dst.GetCounter() != nil && src.GetCounter() != nil {
+		*(dst.GetCounter().Value) += src.GetCounter().GetValue()
+	}
+	if dst.GetHistogram() != nil && src.GetHistogram() != nil {
+		dst_buckets := dst.GetHistogram().GetBucket()
+		src_buckets := src.GetHistogram().GetBucket()
+		for i := range dst_buckets {
+			*(dst_buckets[i].CumulativeCount) += src_buckets[i].GetCumulativeCount()
+		}
+	}
+	if dst.GetSummary() != nil && src.GetSummary() != nil {
+		*(dst.GetSummary().SampleCount) += src.GetSummary().GetSampleCount()
+		*(dst.GetSummary().SampleSum) += src.GetSummary().GetSampleSum()
 	}
 }
