@@ -1,0 +1,122 @@
+name: Golang
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    types: [opened, reopened, synchronize]
+  release:
+    types: [published]
+  schedule:
+  - cron: '15 3 * * 0'
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    name: CI Build
+
+    steps:
+    - name: Setup Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: '1.11'
+    - name: Checkout code
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+        path: go/src/github.com/rebuy-de/exporter-merger
+    - name: Setup tools
+      env:
+        GO111MODULE: off
+        GOPATH: /home/runner/work/exporter-merger/exporter-merger/go
+      run: |
+        cd go/src/github.com/rebuy-de/exporter-merger
+        go get -u golang.org/x/lint/golint
+        go get -u github.com/golang/dep/cmd/dep
+        echo "/home/runner/work/exporter-merger/exporter-merger/go/bin" >> $GITHUB_PATH
+    - name: Build Project
+      env:
+        GO111MODULE: off
+        GOPATH: /home/runner/work/exporter-merger/exporter-merger/go
+      run: |
+        cd go/src/github.com/rebuy-de/exporter-merger
+        make vendor
+        make
+
+  container_build:
+    runs-on: ubuntu-20.04
+    name: Container Build
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Generate image tags for releaes
+      if: ${{ github.event_name == 'release' }}
+      shell: bash
+      run: echo "##[set-output name=tags;]quay.io/rebuy/exporter-merger:${GITHUB_REF#refs/tags/},074509403805.dkr.ecr.eu-west-1.amazonaws.com/exporter-merger:${GITHUB_REF#refs/tags/}"
+      id: generate_tags_release
+
+    - name: Generate image tags for PRs
+      if: ${{ github.event_name != 'release' }}
+      shell: bash
+      run: |
+        if [ "${GITHUB_EVENT_NAME}" == "pull_request" ]; then
+          echo "##[set-output name=tags;]quay.io/rebuy/exporter-merger:${GITHUB_HEAD_REF},074509403805.dkr.ecr.eu-west-1.amazonaws.com/exporter-merger:${GITHUB_HEAD_REF}"
+        else
+          echo "##[set-output name=tags;]quay.io/rebuy/exporter-merger:master,074509403805.dkr.ecr.eu-west-1.amazonaws.com/exporter-merger:master,\
+            quay.io/rebuy/exporter-merger:latest,074509403805.dkr.ecr.eu-west-1.amazonaws.com/exporter-merger:latest"
+        fi
+      id: generate_tags_pr
+
+    - name: Set up QEMU
+      if: ${{ github.event_name == 'release' }}
+      id: qemu
+      uses: docker/setup-qemu-action@v1
+      with:
+        platforms: arm64
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v1
+      with:
+        install: true
+
+    # Only used to prevent rate limits
+    - name: Login to Docker Hub
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Login to ECR
+      uses: docker/login-action@v1
+      with:
+        registry: 074509403805.dkr.ecr.eu-west-1.amazonaws.com
+        username: ${{ secrets.AWS_ECR_ACCESS_KEY_ID }}
+        password: ${{ secrets.AWS_ECR_SECRET_ACCESS_KEY }}
+
+    - name: Login to Quay.io
+      uses: docker/login-action@v1
+      with:
+        registry: quay.io
+        username: ${{ secrets.QUAY_USERNAME }}
+        password: ${{ secrets.QUAY_PASSWORD }}
+
+    - name: Build and push
+      if: ${{ github.event_name == 'release' }}
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.generate_tags_release.outputs.tags }}
+        platforms: linux/amd64,linux/arm64
+
+    - name: Build and push
+      if: ${{ github.event_name != 'release' }}
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.generate_tags_pr.outputs.tags }}
+        platforms: linux/amd64
