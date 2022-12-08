@@ -1,6 +1,10 @@
 # exporter-merger
 
-[![Build Status](https://travis-ci.org/rebuy-de/exporter-merger.svg?branch=master)](https://travis-ci.org/rebuy-de/exporter-merger)
+> :warning: We archived this project because we don't use it anymore and in
+> the meantime some other solutions for the problem described in
+> [prometheus/prometheus#3756](https://github.com/prometheus/prometheus/issues/3756)
+> became available.
+
 [![license](https://img.shields.io/github/license/rebuy-de/exporter-merger.svg)]()
 [![GitHub release](https://img.shields.io/github/release/rebuy-de/exporter-merger.svg)]()
 
